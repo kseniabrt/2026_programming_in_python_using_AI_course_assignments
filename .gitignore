@@ -1,0 +1,10 @@
+# Data folders (input data and generated reports/plots), in any Day folder
+**/data/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
