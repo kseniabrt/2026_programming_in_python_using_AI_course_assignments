@@ -16,7 +16,22 @@ Observe for each subject: pupil signal, pupil signal preprocessed - in each step
 
 ## data context:
 
-Segmented tables context - within data folder there are two '02_' folders with data files. 
+Segmented tables context - within data folder there are '01_' and '02_' folders with data files. 
+
+### Parsed EyeLink tables:
+
+The parsing pipeline saves one Parquet file per subject as `s_<subject>_.parquet` under `processedData_py2026/pupil/<table name>/`. The table below covers folders beginning with `01_`, including the companion behavioral CSV export.
+
+| Table name | Content | Schema |
+| --- | --- | --- |
+| `01_behavior` | One row per behavioral trial, selected from the subject's behavior CSV. | `trialnr`, `validity`, `response`, `acc`, `rt`, `outcome` |
+| `01_pupil` | Continuous EyeLink gaze and pupil samples, reindexed at 1 ms intervals by default. | Index: `time`; columns: `gaze_x`, `gaze_y`, `pupil` |
+| `01_trials` | One row per trial, assembled from EyeLink messages. | Event/timing columns: `starttrial`, `endtrial`, `startmask`, `endmask`, `startcue`, `stopcue`, `startoutcome`, `stopoutcome`; trial-variable columns: `block`, `trialnr`, `stimulus`, `condition`, `valence`, `required_action`, `manipulation`, `govalidity`, `nogovalidity`, `isi`, `iti`, `response`, `acc`, `rt`, `outcome` |
+| `01_blinks` | One row per completed EyeLink blink event. | `eye`, `start_time`, `end_time`, `duration_ms` |
+| `01_fixations` | One row per completed EyeLink fixation event, with average gaze position and pupil value. | `eye`, `start_time`, `end_time`, `duration_ms`, `average_gaze_x`, `average_gaze_y`, `average_pupil` |
+| `01_saccades` | One row per completed EyeLink saccade event, with gaze endpoints, amplitude, and peak velocity. | `eye`, `start_time`, `end_time`, `duration_ms`, `start_gaze_x`, `start_gaze_y`, `end_gaze_x`, `end_gaze_y`, `amplitude_deg`, `peak_velocity_deg_per_s` |
+
+### Segmented data:
 
 The segmentation pipeline saves one Parquet file per subject as `s_<subject>_.parquet` in each `02_` folder. Each file is a wide matrix of pupil measurements: rows are milliseconds relative to an event onset, and columns are trial numbers from `01_trials`.
 

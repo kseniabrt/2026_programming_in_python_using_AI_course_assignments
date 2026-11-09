@@ -40,3 +40,16 @@ Things to know:
 
 please add git ignore for data folder content, as well as cache files. tell me if there any more files should be ignored from git.
 
+## Prompt 3
+
+Hello Claude, how are you?
+I've added data for 01_behavior, 01_blinks, 01_fixations, 01_saccades and 01_trials. I would like we now use this data to complete the preprocessing with the essential data of blinks and saccades, as described in Day03 prompt.md context file. 
+please observe, plan, ask for clarifications and implement. 
+thank you!
+
+## Prompt 4
+
+Please add also:
+1. between stage 10 and 11 - another stage with the histograms of the trial-by-trial baseline (in the same way as trial-by-trial dilation)
+2. order subjects (rows) by total accuracy in the task
+

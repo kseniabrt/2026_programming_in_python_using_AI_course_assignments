@@ -125,8 +125,9 @@ def build_report(
 <body>
 <h1>Pupil signal preprocessing — {html.escape(dataset_name)}</h1>
 <p class="meta">{len(subjects)} subjects · generated {datetime.now():%Y-%m-%d %H:%M} ·
-pipeline after Algermissen &amp; den Ouden (2024). Blink/saccade padding not applied yet
-(no EyeLink event data). Click any plot to open it full size.</p>
+pipeline after Algermissen &amp; den Ouden (2024). Blinks and saccades from the EyeLink
+event tables (01_blinks, 01_saccades), trial onsets and blocks from 01_trials.
+Click any plot to open it full size.</p>
 
 <h2>Overview</h2>
 <div class="cards">
@@ -135,7 +136,8 @@ pipeline after Algermissen &amp; den Ouden (2024). Blink/saccade padding not app
 </div>
 
 <h2>Preprocessing stages</h2>
-<p class="meta">Rows: subjects (first row aggregates all subjects). Columns: preprocessing
+<p class="meta">Rows: subjects ordered by task accuracy, highest first (first row aggregates
+all subjects). Columns: preprocessing
 stages in order. Grey = single trials, blue = trial mean, dashed line = event onset.</p>
 <div class="grid-wrap">
 <table class="grid">
@@ -154,8 +156,8 @@ stages in order. Grey = single trials, blue = trial mean, dashed line = event on
 def _generic_description(stage: Stage) -> str:
     """Column-header text: the stage description without subject-specific numbers."""
     generic = {
-        "missing_marked": "Samples equal to 0 (tracker lost the pupil) set to missing. "
-                          "Blink/saccade padding skipped for now (no event data).",
+        "blinks_removed": "EyeLink blinks ± padding (and any 0 samples) deleted.",
+        "saccades_removed": "EyeLink saccades ± padding deleted.",
         "fast_changes_removed": "Samples with |z(first derivative)| > threshold deleted; "
                                 "marks closer than the merge distance joined.",
         "trial_exclusion": "Trials with too many missing/interpolated samples "
@@ -167,5 +169,6 @@ def _generic_description(stage: Stage) -> str:
 
 def _subject_note(summary: pd.DataFrame, subject: str) -> str:
     row = summary.loc[summary["subject"] == subject].iloc[0]
-    return (f"{row['missing_total_pct']:.1f}% missing · "
+    return (f"accuracy {row['accuracy_pct']:.1f}% · "
+            f"{row['missing_total_pct']:.1f}% missing · "
             f"{row['n_excluded']}/{row['n_trials']} excluded")

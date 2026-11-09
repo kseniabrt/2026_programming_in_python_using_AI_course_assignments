@@ -20,6 +20,7 @@ from .report import build_report
 
 OUTPUT_FOLDER_NAME = "vis_html_of_pupil_signal_preprocessing"
 SUBJECT_FILE = re.compile(r"^s_(?P<subject>.+?)_\.parquet$")
+SEGMENT_FOLDER = re.compile(r"^02_.*_(?P<event>[a-z]+)_\d+_\d+ms$")
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
@@ -33,6 +34,49 @@ def find_subject_files(folder: Path) -> dict[str, Path]:
     return files
 
 
+def onset_column(folder: Path) -> str:
+    """Event the segments are aligned to, from the folder name.
+
+    ``02_pupil_timecourse_startmask_1000_2966ms`` -> ``startmask``.
+    """
+    match = SEGMENT_FOLDER.match(folder.name)
+    if not match:
+        raise ValueError(f"Cannot read the onset event from folder name {folder.name!r}")
+    return match["event"]
+
+
+def read_optional(path: Path) -> pd.DataFrame | None:
+    if path.exists():
+        return pd.read_parquet(path)
+    print(f"    [warn] missing {path.parent.name}/{path.name}")
+    return None
+
+
+def load_subject_context(data_dir: Path, subject: str, event: str) -> dict:
+    """Onsets, blocks, blinks and saccades of one subject from the 01_ tables."""
+    name = f"s_{subject}_.parquet"
+    trials = read_optional(data_dir / "01_trials" / name)
+    context = {
+        "blinks": read_optional(data_dir / "01_blinks" / name),
+        "saccades": read_optional(data_dir / "01_saccades" / name),
+        "onsets": None,
+        "blocks": None,
+    }
+    if trials is not None:
+        trials = trials.set_index("trialnr")
+        context["onsets"] = trials[event]
+        context["blocks"] = trials["block"]
+    return context
+
+
+def subject_accuracy(data_dir: Path, subject: str) -> float:
+    """Share of correct trials (mean of ``acc``) in 01_behavior; NaN if unknown."""
+    behavior = read_optional(data_dir / "01_behavior" / f"s_{subject}_.parquet")
+    if behavior is None or "acc" not in behavior:
+        return float("nan")
+    return float(behavior["acc"].mean())
+
+
 def process_folder(folder: Path, params: PreprocessingParams) -> Path | None:
     """Preprocess every subject in one ``02_`` folder and write its report."""
     subject_files = find_subject_files(folder)
@@ -42,13 +86,18 @@ def process_folder(folder: Path, params: PreprocessingParams) -> Path | None:
 
     out_dir = folder / OUTPUT_FOLDER_NAME
     plots_dir, stages_dir = out_dir / "plots", out_dir / "stages"
-    print(f"[{folder.name}] {len(subject_files)} subjects -> {out_dir}")
+    event = onset_column(folder)
+    print(f"[{folder.name}] {len(subject_files)} subjects, onset '{event}' -> {out_dir}")
 
     results: list[PipelineResult] = []
     plot_paths: dict[str, dict[str, Path]] = {"all": {}}
     for subject, path in subject_files.items():
         print(f"  s{subject}: preprocessing")
-        result = run_pipeline(pd.read_parquet(path), subject, params)
+        context = load_subject_context(folder.parent, subject, event)
+        result = run_pipeline(pd.read_parquet(path), subject, params, **context)
+        accuracy = subject_accuracy(folder.parent, subject)
+        result.summary = {"subject": subject, "accuracy_pct": round(100 * accuracy, 1),
+                          **{k: v for k, v in result.summary.items() if k != "subject"}}
         results.append(result)
 
         excluded = result.trial_metrics["excluded"]
@@ -65,6 +114,9 @@ def process_folder(folder: Path, params: PreprocessingParams) -> Path | None:
                 table.columns = table.columns.astype(str)
                 table.to_parquet(stage_file)
 
+    # Rows ordered by task accuracy, best first (unknown accuracy last).
+    results.sort(key=lambda r: -r.summary["accuracy_pct"]
+                 if pd.notna(r.summary["accuracy_pct"]) else float("inf"))
     subjects = [r.subject for r in results]
     excluded_all = [r.trial_metrics["excluded"] for r in results]
     for i, template in enumerate(results[0].stages):

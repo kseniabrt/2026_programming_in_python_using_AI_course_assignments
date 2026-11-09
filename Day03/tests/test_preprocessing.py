@@ -8,6 +8,7 @@ import pandas as pd
 from vis_html_of_pupil_signal_preprocessing.preprocessing import (
     PreprocessingParams,
     block_of_trial,
+    event_mask,
     fast_change_mask,
     interpolate_linear,
     lowpass_filter,
@@ -93,13 +94,53 @@ class TestPipeline(unittest.TestCase):
         df = make_segments(trials=(1, 2, 3))
         df.iloc[:1500, 2] = 0.0  # trial 3: 75% zeros
         result = run_pipeline(df, "99", PreprocessingParams())
-        self.assertEqual(len(result.stages), 10)
+        self.assertEqual(len(result.stages), 12)
+        self.assertEqual([s.metric for s in result.stages[-2:]],
+                         ["baseline_psc", "dilation_psc"])
         self.assertTrue(result.trial_metrics.loc[3, "excluded"])
         self.assertFalse(result.trial_metrics.loc[1, "excluded"])
         self.assertEqual(result.summary["n_excluded"], 1)
-        final = result.stages[8].data
+        final = next(s for s in result.stages if s.key == "baseline_corrected").data
         self.assertNotIn(3, final.columns)
         self.assertFalse(final.isna().any().any())
+
+    def test_pipeline_removes_padded_blinks_and_saccades(self):
+        df = make_segments(trials=(1, 2))  # time -1000 .. 1000
+        onsets = pd.Series({1: 10_000, 2: 20_000})
+        blinks = pd.DataFrame({"start_time": [10_000], "end_time": [10_100]})
+        saccades = pd.DataFrame({"start_time": [20_500], "end_time": [20_510]})
+        result = run_pipeline(df, "99", PreprocessingParams(), onsets=onsets,
+                              blinks=blinks, saccades=saccades,
+                              blocks=pd.Series({1: 7, 2: 7}))
+        no_blinks = result.stages[1].data
+        no_saccades = result.stages[2].data
+        self.assertEqual(no_blinks[1].isna().sum(), 401)  # -150 .. 250 ms
+        self.assertEqual(no_blinks[2].isna().sum(), 0)
+        self.assertEqual(no_saccades[2].isna().sum(), 51)  # 480 .. 530 ms
+        self.assertTrue((result.trial_metrics["block"] == 7).all())
+
+
+class TestEventMask(unittest.TestCase):
+    def test_event_mask_uses_onset_and_padding(self):
+        df = make_segments(n_time=21, trials=(1, 2), start_ms=-10)  # -10 .. 10
+        onsets = pd.Series({1: 1000, 2: 5000})
+        events = pd.DataFrame({"start_time": [1002], "end_time": [1003]})
+        mask = event_mask(df, onsets, events, padding_ms=2)
+        self.assertEqual(mask[1][mask[1]].index.tolist(), [0, 1, 2, 3, 4, 5])
+        self.assertFalse(mask[2].any())
+
+    def test_event_mask_catches_event_outside_window_via_padding(self):
+        df = make_segments(n_time=21, trials=(1,), start_ms=-10)
+        onsets = pd.Series({1: 1000})
+        long_before = pd.DataFrame({"start_time": [900, 950], "end_time": [985, 960]})
+        mask = event_mask(df, onsets, long_before, padding_ms=10)
+        self.assertEqual(mask[1][mask[1]].index.tolist(), [-10, -9, -8, -7, -6, -5])
+
+    def test_event_mask_without_events_or_onset(self):
+        df = make_segments(n_time=21, trials=(1,), start_ms=-10)
+        events = pd.DataFrame({"start_time": [1000], "end_time": [1005]})
+        self.assertFalse(event_mask(df, pd.Series({1: 1000}), None, 0).any().any())
+        self.assertFalse(event_mask(df, pd.Series(dtype=float), events, 0).any().any())
 
 
 if __name__ == "__main__":

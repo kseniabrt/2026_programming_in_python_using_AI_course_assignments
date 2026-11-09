@@ -27,6 +27,11 @@ TEXT = "#0b0b0b"
 MUTED = "#52514e"
 GRID = "#e4e3df"
 
+METRIC_LABELS = {
+    "baseline_psc": "baseline (mean −500…0 ms, % signal change)",
+    "dilation_psc": "dilation (peak − baseline, % signal change)",
+}
+
 FIGSIZE = (4.6, 3.2)
 DPI = 110
 
@@ -96,7 +101,7 @@ def plot_stage(stage: Stage, subject: str, path: Path, params: PreprocessingPara
                excluded: pd.Series | None = None) -> None:
     title = f"s{subject} · {stage.title}"
     if stage.kind == "metrics":
-        _plot_dilation_hist(stage.data, title, path)
+        _plot_metric_hist(stage.data[stage.metric], title, path, METRIC_LABELS[stage.metric])
         return
 
     fig, ax = _new_axes()
@@ -126,14 +131,14 @@ def plot_stage(stage: Stage, subject: str, path: Path, params: PreprocessingPara
     _finish(fig, ax, path, title, "time from event onset (ms)", stage.y_label)
 
 
-def _plot_dilation_hist(metrics: pd.DataFrame, title: str, path: Path) -> None:
+def _plot_metric_hist(values: pd.Series, title: str, path: Path, x_label: str) -> None:
     fig, ax = _new_axes()
-    dilation = metrics["dilation_psc"].dropna().to_numpy()
-    if dilation.size:
-        ax.hist(dilation, bins=30, color=MEAN_COLOR, edgecolor=SURFACE, linewidth=1)
-        median = float(np.median(dilation))
+    values = values.dropna().to_numpy()
+    if values.size:
+        ax.hist(values, bins=30, color=MEAN_COLOR, edgecolor=SURFACE, linewidth=1)
+        median = float(np.median(values))
         ax.axvline(median, color=TEXT, linewidth=1.2, label=f"median = {median:.1f}%")
-    _finish(fig, ax, path, title, "dilation (peak − baseline, % signal change)", "trials")
+    _finish(fig, ax, path, title, x_label, "trials")
 
 
 # --------------------------------------------------------------------------- #
@@ -148,12 +153,13 @@ def plot_stage_all_subjects(stages: list[Stage], subjects: list[str],
     fig, ax = _new_axes()
 
     if first.kind == "metrics":
-        all_vals = np.concatenate([s.data["dilation_psc"].dropna().to_numpy() for s in stages])
+        col = first.metric
+        all_vals = np.concatenate([s.data[col].dropna().to_numpy() for s in stages])
         bins = np.histogram_bin_edges(all_vals, bins=30) if all_vals.size else 30
         for i, (stage, subject) in enumerate(zip(stages, subjects)):
-            ax.hist(stage.data["dilation_psc"].dropna(), bins=bins, histtype="step",
+            ax.hist(stage.data[col].dropna(), bins=bins, histtype="step",
                     linewidth=2, color=subject_color(i), label=f"s{subject}")
-        _finish(fig, ax, path, title, "dilation (peak − baseline, % signal change)", "trials")
+        _finish(fig, ax, path, title, METRIC_LABELS[col], "trials")
         return
 
     if first.kind == "baseline":
