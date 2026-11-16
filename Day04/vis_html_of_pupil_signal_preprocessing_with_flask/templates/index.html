@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pupil Preprocessing Explorer</title>
+<style>
+{{ css | safe }}
+form.filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+form.filters fieldset { margin: 0; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); padding: 10px 14px; min-width: 220px; }
+form.filters legend { font-weight: 600; padding: 0 4px; }
+form.filters label { display: block; padding: 2px 0; cursor: pointer; }
+form.filters label small { color: var(--text-2); }
+form.filters select { font: inherit; padding: 4px; max-width: 100%;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
+.toggles { margin: 4px 0 6px; display: flex; gap: 6px; }
+button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); padding: 3px 10px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff;
+  padding: 8px 18px; font-weight: 600; }
+.actions { align-self: flex-end; }
+.empty { padding: 16px; color: var(--text-2); }
+</style>
+</head>
+<body>
+<h1>Pupil signal preprocessing — {{ dataset_name }}</h1>
+<p class="meta">{{ ds.subjects | length }} subjects · onset event <b>{{ ds.onset_event }}</b> ·
+outputs generated {{ ds.generated }} · pipeline after Algermissen &amp; den Ouden (2024).
+Blinks and saccades from the EyeLink event tables (01_blinks, 01_saccades), trial onsets and
+blocks from 01_trials. Click any plot to open it full size.</p>
+
+<h2>Show</h2>
+<form class="filters" method="get" action="/">
+  <input type="hidden" name="applied" value="1">
+
+  <fieldset>
+    <legend>Dataset</legend>
+    <select name="dataset" onchange="this.form.submit()">
+      {% for name in datasets %}
+      <option value="{{ name }}" {% if name == dataset_name %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </fieldset>
+
+  <fieldset data-group="subject">
+    <legend>Subjects (rows)</legend>
+    <div class="toggles">
+      <button type="button" data-set="1">Select all</button>
+      <button type="button" data-set="0">Clear</button>
+    </div>
+    {% for s in subject_options %}
+    <label><input type="checkbox" name="subject" value="{{ s.id }}"
+      {% if s.id in subject_ids %}checked{% endif %}>
+      {{ s.label }} <small>{{ s.note }}</small></label>
+    {% endfor %}
+  </fieldset>
+
+  <fieldset data-group="stage">
+    <legend>Preprocessing stages (columns)</legend>
+    <div class="toggles">
+      <button type="button" data-set="1">Select all</button>
+      <button type="button" data-set="0">Clear</button>
+    </div>
+    {% for st in ds.stages %}
+    <label><input type="checkbox" name="stage" value="{{ st.slug }}"
+      {% if st.slug in stage_slugs %}checked{% endif %}>
+      <span class="step">{{ st.number }}.</span> {{ st.title }}</label>
+    {% endfor %}
+  </fieldset>
+
+  <div class="actions"><button type="submit" class="primary">Apply</button></div>
+</form>
+
+<h2>Overview</h2>
+<div class="cards">
+  <div class="card"><b>Per-subject summary</b>
+    <table class="info">
+      <thead><tr>{% for c in ds.summary_columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for row in ds.summary %}
+        <tr>{% for c in ds.summary_columns %}
+          {% set v = row[c] %}
+          <td{% if v is number %} class="num"{% endif %}>{{ v }}</td>
+        {% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card"><b>Parameters</b>
+    <table class="info">
+      <thead><tr><th>parameter</th><th>value</th></tr></thead>
+      <tbody>{% for k, v in ds.params %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</div>
+
+<h2>Preprocessing stages</h2>
+<p class="meta">Rows: subjects ordered by task accuracy, highest first ("All subjects" aggregates
+every subject in the dataset). Columns: preprocessing stages in order. Grey = single trials,
+blue = trial mean, dashed line = event onset.</p>
+{% if rows and stages %}
+<div class="grid-wrap">
+<table class="grid">
+  <thead><tr>
+    <th class="rowhead">Subject</th>
+    {% for st in stages %}
+    <th><b><span class="step">{{ st.number }}.</span> {{ st.title }}</b><span>{{ st.description }}</span></th>
+    {% endfor %}
+  </tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr{% if r.id == 'all' %} class="aggregate"{% endif %}>
+      <th class="rowhead">{{ r.label }}<small>{{ r.note }}</small></th>
+      {% for st in stages %}
+      {% set src = url_for('plot', dataset=dataset_name, filename=ds.plots[r.id][st.slug]) %}
+      <td><a href="{{ src }}" target="_blank"><img src="{{ src }}" alt="{{ r.label }} – {{ st.title }}" loading="lazy"></a></td>
+      {% endfor %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Nothing to show: select at least one subject and one stage, then press Apply.</div>
+{% endif %}
+
+<script>
+  // "Select all" / "Clear" buttons tick or untick every box in their group.
+  document.querySelectorAll("fieldset[data-group] .toggles button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var on = btn.dataset.set === "1";
+      btn.closest("fieldset").querySelectorAll("input[type=checkbox]")
+        .forEach(function (box) { box.checked = on; });
+    });
+  });
+</script>
+</body>
+</html>
