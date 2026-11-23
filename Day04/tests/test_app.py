@@ -4,6 +4,7 @@ Run from Day04: python -m unittest discover -s tests -t .
 """
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -85,6 +86,16 @@ class TestApp(unittest.TestCase):
     def test_empty_selection_shows_message(self):
         page = self.client.get("/?applied=1&stage=01_raw").get_data(as_text=True)
         self.assertIn("Nothing to show", page)
+
+    def test_plots_load_with_relative_data_dir(self):
+        cwd = os.getcwd()
+        os.chdir(self.tmp.name)
+        try:
+            client = create_app(Path(".")).test_client()
+            with client.get(f"/plots/{DATASET}/10_01.png") as response:
+                self.assertEqual(response.status_code, 200)
+        finally:
+            os.chdir(cwd)
 
     def test_plot_route_serves_file_and_rejects_unknown(self):
         with self.client.get(f"/plots/{DATASET}/10_01.png") as response:

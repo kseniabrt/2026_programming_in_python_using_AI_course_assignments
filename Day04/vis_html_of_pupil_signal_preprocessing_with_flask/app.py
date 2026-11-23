@@ -42,6 +42,9 @@ def selected(values: list[str], allowed: list[str], applied: bool) -> list[str]:
 
 
 def create_app(data_dir: Path) -> Flask:
+    # Absolute path: Flask resolves a relative folder in send_from_directory
+    # against the package folder, not the current folder, so plots would 404.
+    data_dir = Path(data_dir).resolve()
     datasets = load_datasets(data_dir)
     if not datasets:
         raise RuntimeError(f"No built datasets in {data_dir}; run the build first.")

@@ -4,6 +4,8 @@ Run from the ``Day03`` folder::
 
     python -m vis_html_of_pupil_signal_preprocessing
     python -m vis_html_of_pupil_signal_preprocessing --data-dir path/to/data
+
+By default the data is read from ``<repo>/sample_data1``.
 """
 
 from __future__ import annotations
@@ -21,7 +23,8 @@ from .report import build_report
 OUTPUT_FOLDER_NAME = "vis_html_of_pupil_signal_preprocessing"
 SUBJECT_FILE = re.compile(r"^s_(?P<subject>.+?)_\.parquet$")
 SEGMENT_FOLDER = re.compile(r"^02_.*_(?P<event>[a-z]+)_\d+_\d+ms$")
-DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+# Shared data folder at the repository root: <repo>/sample_data1
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "sample_data1"
 
 
 def find_subject_files(folder: Path) -> dict[str, Path]:
@@ -143,7 +146,8 @@ def process_folder(folder: Path, params: PreprocessingParams) -> Path | None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR,
-                        help="folder containing the 02_* segment folders")
+                        help="folder with the 01_* and 02_* data folders "
+                             "(default: <repo>/sample_data1)")
     args = parser.parse_args(argv)
 
     folders = sorted(p for p in args.data_dir.glob("02_*") if p.is_dir())

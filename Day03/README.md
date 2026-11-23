@@ -7,6 +7,77 @@ I want to understand more a signal preprocessing in Algermissen (2024) dataset, 
 I gave as a context the actual relevant paragraph from the article and designed my desired output in an html page format. 
 
 
+## How to run
+
+Requirements: Python 3.10+ with `numpy`, `pandas`, `pyarrow`, `scipy`, `matplotlib`
+(`pip install numpy pandas pyarrow scipy matplotlib`).
+
+Open cmd **in the `Day03` folder** and run:
+
+```
+python -m vis_html_of_pupil_signal_preprocessing                         # reads ..\sample_data1
+python -m vis_html_of_pupil_signal_preprocessing --data-dir C:\other\data  # another data folder
+python -m unittest discover -s tests -t .                                 # run the tests
+```
+
+The program preprocesses every subject in every `02_*` folder (about 25 s in total) and writes,
+for each `02_*` folder, a report to
+`sample_data1\<02_folder>\vis_html_of_pupil_signal_preprocessing\report.html`.
+Open that file in a browser. Rows are subjects (ordered by task accuracy), columns are the
+12 preprocessing stages.
+
+Code: `vis_html_of_pupil_signal_preprocessing/`
+- `__main__.py`: entry point (finds the data, runs everything, saves the outputs)
+- `preprocessing.py`: the preprocessing steps (Algermissen & den Ouden, 2024)
+- `plotting.py`: the figures
+- `report.py`: the HTML report
+
+
+## Data: sample_data1
+
+The data lives in one shared folder at the repository root, used by both Day03 and Day04.
+The input files are in git; the outputs the programs generate are not (see `.gitignore`).
+
+```
+<repo>\
+├── Day03\
+├── Day04\
+└── sample_data1\
+    ├── 01_trials\          s_08_.parquet, s_10_.parquet, s_30_.parquet
+    ├── 01_blinks\          (same s_<subject>_.parquet files in every folder)
+    ├── 01_saccades\
+    ├── 01_behavior\
+    ├── 01_fixations\
+    ├── 02_pupil_timecourse_startmask_1000_2966ms\
+    └── 02_pupil_timecourse_startoutcome_1000_2000ms\
+```
+
+Each folder holds one Parquet file per subject, named `s_<subject>_.parquet`.
+
+| Folder | Needed? | Content |
+| --- | --- | --- |
+| `02_pupil_timecourse_<event>_<before>_<after>ms` | **yes** | Pupil segments: rows = ms from the event onset (`time_from_event_start_ms`), columns = trials (`trialnr`). One report is made per `02_` folder. `<event>` must be a column of `01_trials` (e.g. `startmask`, `startoutcome`). |
+| `01_trials` | **yes** | One row per trial: `trialnr`, `block` (block for % signal change) and the event times (`startmask`, `startoutcome`, …) in EyeLink time. Needed to place blinks and saccades in each segment. |
+| `01_blinks` | **yes** | EyeLink blink events: `start_time`, `end_time` (EyeLink time). Removed with 150 ms padding. |
+| `01_saccades` | **yes** | EyeLink saccade events: `start_time`, `end_time`, … Removed with 20 ms padding. |
+| `01_behavior` | recommended | One row per trial with `acc` (correct = 1). Used to order subjects by accuracy. |
+| `01_fixations` | no | EyeLink fixation events; not used by the program. |
+
+If a `01_` file is missing, the program prints a warning and skips what depends on it (for
+example, without `01_blinks` no blinks are removed, and without `01_behavior` the subject is
+listed last). The `_Screenshot ….png` files in some folders are documentation only.
+
+The program adds its outputs inside each `02_` folder, in `vis_html_of_pupil_signal_preprocessing\`
+(Day04 uses `vis_html_of_pupil_signal_preprocessing_with_flask\`, so the two never clash):
+`report.html`, `plots\`, `stages\` (each stage as Parquet), `subject_summary.csv`,
+`trial_metrics.csv`, `stage_index.csv`.
+
+**Windows path length:** the longest output path is currently 258 characters, just under the
+260 limit. If the repository is moved to a deeper folder, saving fails with
+`FileNotFoundError`. Either keep the repository path short or enable long paths in Windows
+(`LongPathsEnabled` registry setting).
+
+
 ## prompt 1
 
 hello claude, how are you?
